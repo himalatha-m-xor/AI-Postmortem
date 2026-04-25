@@ -5,9 +5,7 @@ import { logger } from '@/lib/logger';
 import { NotFoundError, ValidationError, formatErrorResponse, AIGenerationError } from '@/lib/errors';
 import { rateLimiter, getClientIdentifier } from '@/lib/rate-limit';
 import { config } from '@/lib/config';
-
-// Store generated postmortems in memory (in production, use a database)
-const generatedPostmortems = new Map();
+import { savePostmortem, getPostmortem, getAllPostmortems } from '@/lib/storage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,8 +43,8 @@ export async function POST(request: NextRequest) {
     // Generate postmortem using AI
     const postmortem = await generatePostmortem(incident);
 
-    // Store in memory
-    generatedPostmortems.set(postmortem.id, postmortem);
+    // Store in global storage
+    savePostmortem(postmortem);
 
     logger.info(`✅ Postmortem generated successfully: ${postmortem.id}`);
 
@@ -76,12 +74,12 @@ export async function GET(request: NextRequest) {
       logger.debug('Fetching all postmortems');
       // Return all postmortems
       return NextResponse.json({
-        postmortems: Array.from(generatedPostmortems.values())
+        postmortems: getAllPostmortems()
       });
     }
 
     logger.debug(`Fetching postmortem: ${id}`);
-    const postmortem = generatedPostmortems.get(id);
+    const postmortem = getPostmortem(id);
 
     if (!postmortem) {
       logger.warn(`Postmortem not found: ${id}`);

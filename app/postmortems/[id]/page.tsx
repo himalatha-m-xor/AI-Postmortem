@@ -34,12 +34,210 @@ export default function PostmortemViewer() {
 
   const handleExportPDF = () => {
     if (!postmortem) return;
-    
+
     const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text(`Postmortem: ${postmortem.incidentTitle}`, 20, 20);
+    let yPos = 20;
+    const pageWidth = 170;
+    const lineHeight = 7;
+    const pageHeight = 280;
+
+    // Helper to check if we need a new page
+    const checkNewPage = (requiredSpace: number) => {
+      if (yPos + requiredSpace > pageHeight) {
+        doc.addPage();
+        yPos = 20;
+      }
+    };
+
+    // Helper to add text with word wrap
+    const addText = (text: string, fontSize: number = 10, isBold: boolean = false) => {
+      doc.setFontSize(fontSize);
+      const lines = doc.splitTextToSize(text, pageWidth);
+      checkNewPage(lines.length * lineHeight);
+      doc.text(lines, 20, yPos);
+      yPos += lines.length * lineHeight;
+    };
+
+    // Helper to add section header
+    const addSection = (title: string) => {
+      checkNewPage(15);
+      yPos += 5;
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text(title, 20, yPos);
+      yPos += 10;
+      doc.setFont('helvetica', 'normal');
+    };
+
+    // Title
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Postmortem: ${postmortem.incidentTitle}`, 20, yPos);
+    yPos += 15;
+
+    // Metadata
     doc.setFontSize(10);
-    doc.text(postmortem.executiveSummary, 20, 40, { maxWidth: 170 });
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Severity: ${postmortem.severity.toUpperCase()}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Date: ${new Date(postmortem.startTime).toLocaleString()}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Duration: ${postmortem.durationMinutes} minutes`, 20, yPos);
+    yPos += 7;
+    doc.text(`Users Impacted: ${postmortem.usersImpacted.toLocaleString()}`, 20, yPos);
+    yPos += 7;
+    const servicesLines = doc.splitTextToSize(`Services: ${postmortem.servicesAffected.join(', ')}`, pageWidth);
+    doc.text(servicesLines, 20, yPos);
+    yPos += servicesLines.length * 7;
+    if (postmortem.estimatedRevenueLoss) {
+      doc.text(`Est. Revenue Impact: ${postmortem.estimatedRevenueLoss}`, 20, yPos);
+      yPos += 7;
+    }
+    yPos += 5;
+
+    // Executive Summary
+    addSection('Executive Summary');
+    addText(postmortem.executiveSummary);
+
+    // Timeline
+    if (postmortem.timeline && postmortem.timeline.length > 0) {
+      addSection('Timeline of Events');
+      postmortem.timeline.forEach((event, index) => {
+        checkNewPage(25);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(event.timestamp, 20, yPos);
+        yPos += 6;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        const eventLines = doc.splitTextToSize(event.event, pageWidth - 10);
+        doc.text(eventLines, 25, yPos);
+        yPos += eventLines.length * 5;
+        if (event.user) {
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100);
+          doc.text(`by ${event.user}`, 25, yPos);
+          doc.setTextColor(0, 0, 0);
+          yPos += 5;
+        }
+        yPos += 4;
+      });
+    }
+
+    // Root Cause
+    if (postmortem.rootCause) {
+      addSection('Root Cause Analysis');
+      addText(postmortem.rootCause.summary);
+      yPos += 5;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Technical Details:', 20, yPos);
+      yPos += 7;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      const techLines = doc.splitTextToSize(postmortem.rootCause.technicalDetails, pageWidth);
+      checkNewPage(techLines.length * 5);
+      doc.text(techLines, 20, yPos);
+      yPos += techLines.length * 5 + 5;
+
+      // Add code example if available
+      if (postmortem.rootCause.codeExample) {
+        doc.setFontSize(8);
+        doc.setFont('courier', 'normal');
+        doc.setTextColor(50, 50, 50);
+        const codeLines = doc.splitTextToSize(postmortem.rootCause.codeExample, pageWidth - 10);
+        checkNewPage(codeLines.length * 4 + 10);
+        doc.text(codeLines, 25, yPos);
+        yPos += codeLines.length * 4 + 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+      }
+    }
+
+    // Contributing Factors
+    if (postmortem.contributingFactors && postmortem.contributingFactors.length > 0) {
+      addSection('Contributing Factors');
+      postmortem.contributingFactors.forEach((factor, index) => {
+        checkNewPage(12);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        const factorLines = doc.splitTextToSize(`${index + 1}. ${factor}`, pageWidth - 5);
+        doc.text(factorLines, 20, yPos);
+        yPos += factorLines.length * 6 + 2;
+      });
+    }
+
+    // What Went Well
+    if (postmortem.whatWentWell && postmortem.whatWentWell.length > 0) {
+      addSection('What Went Well');
+      postmortem.whatWentWell.forEach((item, index) => {
+        checkNewPage(12);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        const itemLines = doc.splitTextToSize(`+ ${item}`, pageWidth - 5);
+        doc.text(itemLines, 20, yPos);
+        yPos += itemLines.length * 6 + 2;
+      });
+    }
+
+    // What Went Poorly
+    if (postmortem.whatWentPoorly && postmortem.whatWentPoorly.length > 0) {
+      addSection('What Went Poorly');
+      postmortem.whatWentPoorly.forEach((item, index) => {
+        checkNewPage(12);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        const itemLines = doc.splitTextToSize(`- ${item}`, pageWidth - 5);
+        doc.text(itemLines, 20, yPos);
+        yPos += itemLines.length * 6 + 2;
+      });
+    }
+
+    // Prevention Measures
+    if (postmortem.preventionMeasures && postmortem.preventionMeasures.length > 0) {
+      addSection('Prevention Measures');
+      postmortem.preventionMeasures.forEach((measure, index) => {
+        checkNewPage(20);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`[${measure.priority}]`, 20, yPos);
+        doc.setFont('helvetica', 'normal');
+        doc.text(measure.category, 35, yPos);
+        yPos += 7;
+        doc.setFontSize(9);
+        const actionLines = doc.splitTextToSize(measure.action, pageWidth - 10);
+        doc.text(actionLines, 25, yPos);
+        yPos += actionLines.length * 5;
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Owner: ${measure.owner}`, 25, yPos);
+        doc.setTextColor(0, 0, 0);
+        yPos += 7;
+      });
+    }
+
+    // Action Items
+    if (postmortem.actionItems && postmortem.actionItems.length > 0) {
+      addSection('Action Items');
+      postmortem.actionItems.forEach((item, index) => {
+        checkNewPage(20);
+        doc.setFontSize(10);
+        const taskLines = doc.splitTextToSize(`${index + 1}. ${item.task}`, pageWidth - 5);
+        doc.text(taskLines, 20, yPos);
+        yPos += taskLines.length * 6;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`[${item.priority}]`, 25, yPos);
+        doc.setFont('helvetica', 'normal');
+        yPos += 6;
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Owner: ${item.owner} | Due: ${item.dueDate}`, 25, yPos);
+        doc.setTextColor(0, 0, 0);
+        yPos += 8;
+      });
+    }
+
     doc.save(`postmortem-${postmortem.id}.pdf`);
   };
 

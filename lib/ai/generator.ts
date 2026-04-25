@@ -10,8 +10,14 @@ export async function generatePostmortem(incident: Incident): Promise<Postmortem
     logger.info(`🤖 Starting AI generation for incident: ${incident.id}`);
     const prompt = buildPostmortemPrompt(incident);
 
+    // Use model from env or default
+    const model = process.env.LLM_MODEL || 'gpt-4o-mini';
+    const provider = process.env.LLM_PROVIDER || 'openai';
+
+    logger.debug(`Using ${provider} with model: ${model}`);
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: provider === 'azure' ? process.env.AZURE_OPENAI_DEPLOYMENT_NAME || model : model,
       messages: [
         {
           role: 'system',
