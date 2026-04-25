@@ -190,5 +190,278 @@ export const MOCK_INCIDENTS: Incident[] = [
         message: 'Memory usage exceeds 85%'
       }
     ]
+  },
+  {
+    id: 'inc-003',
+    title: 'SSL Certificate Expiration - Auth Service Down',
+    description: 'Authentication service SSL certificate expired causing 503 errors for all login attempts',
+    severity: 'critical',
+    status: 'open',
+    startTime: '2024-04-23T08:15:00Z',
+    affectedServices: ['Auth Service', 'User Login', 'Admin Panel'],
+    usersImpacted: 5200,
+    slackChannel: '#incident-response',
+    assignedTo: 'Alex Kim',
+    slackMessages: [
+      {
+        timestamp: '2024-04-23T08:15:22Z',
+        user: 'PagerDuty Bot',
+        message: '🚨 CRITICAL: Auth service health check failing - 100% error rate'
+      },
+      {
+        timestamp: '2024-04-23T08:16:45Z',
+        user: 'Alex Kim',
+        message: 'I see it. All login requests returning 503. Checking now.'
+      },
+      {
+        timestamp: '2024-04-23T08:18:12Z',
+        user: 'Alex Kim',
+        message: 'SSL cert expired at midnight. How did we miss this?'
+      },
+      {
+        timestamp: '2024-04-23T08:19:30Z',
+        user: 'Jordan Lee',
+        message: 'The cert renewal reminder went to old-team@company.com which doesn\'t exist anymore'
+      },
+      {
+        timestamp: '2024-04-23T08:21:00Z',
+        user: 'Alex Kim',
+        message: 'Requesting new cert from LetsEncrypt now...'
+      },
+      {
+        timestamp: '2024-04-23T08:35:45Z',
+        user: 'Alex Kim',
+        message: 'New cert issued and deployed to staging. Testing...'
+      },
+      {
+        timestamp: '2024-04-23T08:42:18Z',
+        user: 'Alex Kim',
+        message: 'Staging working. Deploying to prod now.'
+      },
+      {
+        timestamp: '2024-04-23T08:47:33Z',
+        user: 'Alex Kim',
+        message: '✅ RESOLVED. Auth service is back online. All logins working.'
+      }
+    ],
+    logs: [
+      {
+        timestamp: '2024-04-23T08:15:10Z',
+        level: 'error',
+        message: 'SSL certificate validation failed: certificate has expired',
+        service: 'auth-service',
+        stackTrace: 'Error: certificate has expired\n    at TLSSocket.<anonymous> (tls.js:307)\n    at Server.listen (server.js:156)'
+      },
+      {
+        timestamp: '2024-04-23T08:15:15Z',
+        level: 'error',
+        message: 'HTTPS server failed to start: Invalid SSL certificate',
+        service: 'auth-service'
+      },
+      {
+        timestamp: '2024-04-23T08:15:20Z',
+        level: 'error',
+        message: 'Health check failed: Connection refused',
+        service: 'load-balancer'
+      }
+    ],
+    metrics: [
+      { timestamp: '2024-04-23T08:00:00Z', metric: 'auth.success_rate', value: 100, unit: '%' },
+      { timestamp: '2024-04-23T08:15:00Z', metric: 'auth.success_rate', value: 0, unit: '%' },
+      { timestamp: '2024-04-23T08:47:00Z', metric: 'auth.success_rate', value: 98, unit: '%' }
+    ],
+    alerts: [
+      {
+        timestamp: '2024-04-23T08:15:00Z',
+        type: 'trigger',
+        message: 'Auth service down - 100% failure rate'
+      },
+      {
+        timestamp: '2024-04-23T08:16:30Z',
+        type: 'acknowledge',
+        message: 'Incident acknowledged',
+        user: 'Alex Kim'
+      }
+    ]
+  },
+  {
+    id: 'inc-004',
+    title: 'DDoS Attack - Traffic Spike Overload',
+    description: 'Massive traffic spike from suspected DDoS attack overwhelming application servers',
+    severity: 'high',
+    status: 'open',
+    startTime: '2024-04-23T13:22:00Z',
+    affectedServices: ['Web Application', 'CDN', 'Load Balancer'],
+    usersImpacted: 3400,
+    slackChannel: '#incident-response',
+    assignedTo: 'Taylor Singh',
+    slackMessages: [
+      {
+        timestamp: '2024-04-23T13:22:34Z',
+        user: 'Cloudflare Bot',
+        message: '⚠️ WARNING: Traffic spike detected - 500x normal levels from Eastern Europe IPs'
+      },
+      {
+        timestamp: '2024-04-23T13:24:11Z',
+        user: 'Taylor Singh',
+        message: 'Seeing massive traffic spike. Pattern looks like DDoS - lots of requests to /search endpoint'
+      },
+      {
+        timestamp: '2024-04-23T13:25:45Z',
+        user: 'Morgan Chen',
+        message: 'Application servers are maxing out CPU. Response times > 10s'
+      },
+      {
+        timestamp: '2024-04-23T13:27:20Z',
+        user: 'Taylor Singh',
+        message: 'Enabling Cloudflare "Under Attack" mode to challenge suspicious traffic'
+      },
+      {
+        timestamp: '2024-04-23T13:32:05Z',
+        user: 'Taylor Singh',
+        message: 'Traffic dropping. Blocking top 20 offending IP ranges'
+      },
+      {
+        timestamp: '2024-04-23T13:38:40Z',
+        user: 'Taylor Singh',
+        message: 'Adding rate limiting to /search endpoint - 10 req/min per IP'
+      },
+      {
+        timestamp: '2024-04-23T13:45:12Z',
+        user: 'Morgan Chen',
+        message: 'CPU normalizing. Response times back under 500ms'
+      },
+      {
+        timestamp: '2024-04-23T13:52:28Z',
+        user: 'Taylor Singh',
+        message: '✅ Mitigated. Monitoring for any further attacks.'
+      }
+    ],
+    logs: [
+      {
+        timestamp: '2024-04-23T13:22:15Z',
+        level: 'warning',
+        message: 'High request rate detected: 15000 req/s (normal: 30 req/s)',
+        service: 'load-balancer'
+      },
+      {
+        timestamp: '2024-04-23T13:23:45Z',
+        level: 'error',
+        message: 'CPU throttling - 98% utilization',
+        service: 'app-server-1'
+      },
+      {
+        timestamp: '2024-04-23T13:24:00Z',
+        level: 'error',
+        message: 'Request timeout - queue full',
+        service: 'app-server-2'
+      }
+    ],
+    metrics: [
+      { timestamp: '2024-04-23T13:00:00Z', metric: 'requests.per_second', value: 28, unit: 'req/s' },
+      { timestamp: '2024-04-23T13:22:00Z', metric: 'requests.per_second', value: 15240, unit: 'req/s' },
+      { timestamp: '2024-04-23T13:35:00Z', metric: 'requests.per_second', value: 856, unit: 'req/s' },
+      { timestamp: '2024-04-23T13:50:00Z', metric: 'requests.per_second', value: 42, unit: 'req/s' }
+    ],
+    alerts: [
+      {
+        timestamp: '2024-04-23T13:22:00Z',
+        type: 'trigger',
+        message: 'Abnormal traffic spike detected'
+      },
+      {
+        timestamp: '2024-04-23T13:24:00Z',
+        type: 'acknowledge',
+        message: 'Incident acknowledged',
+        user: 'Taylor Singh'
+      }
+    ]
+  },
+  {
+    id: 'inc-005',
+    title: 'Deployment Rollback - Breaking Change in Production',
+    description: 'New deployment introduced breaking API changes causing client application failures',
+    severity: 'high',
+    status: 'open',
+    startTime: '2024-04-23T16:05:00Z',
+    affectedServices: ['REST API v2', 'Mobile App', 'Web Dashboard'],
+    usersImpacted: 1850,
+    slackChannel: '#incident-response',
+    assignedTo: 'Casey Martinez',
+    slackMessages: [
+      {
+        timestamp: '2024-04-23T16:05:42Z',
+        user: 'Sentry Bot',
+        message: '⚠️ ERROR SPIKE: 400 Bad Request errors increased 2000% in last 5 minutes'
+      },
+      {
+        timestamp: '2024-04-23T16:07:15Z',
+        user: 'Casey Martinez',
+        message: 'Mobile apps crashing. Error logs showing "userId field missing from API response"'
+      },
+      {
+        timestamp: '2024-04-23T16:08:33Z',
+        user: 'Jamie Parker',
+        message: 'We deployed API v2.8.0 at 16:00. Must be related.'
+      },
+      {
+        timestamp: '2024-04-23T16:09:45Z',
+        user: 'Casey Martinez',
+        message: 'Checking the diff... oh no. We renamed userId to user_id but mobile app expects camelCase'
+      },
+      {
+        timestamp: '2024-04-23T16:11:20Z',
+        user: 'Jamie Parker',
+        message: 'This should\'ve been caught in integration tests. Initiating rollback now.'
+      },
+      {
+        timestamp: '2024-04-23T16:15:50Z',
+        user: 'Jamie Parker',
+        message: 'Rollback deployed. Testing...'
+      },
+      {
+        timestamp: '2024-04-23T16:18:35Z',
+        user: 'Casey Martinez',
+        message: 'Mobile app working again. Error rate dropping.'
+      },
+      {
+        timestamp: '2024-04-23T16:22:10Z',
+        user: 'Jamie Parker',
+        message: '✅ RESOLVED. Error rate back to normal. Will fix v2.8.0 properly with backwards compatibility.'
+      }
+    ],
+    logs: [
+      {
+        timestamp: '2024-04-23T16:05:30Z',
+        level: 'error',
+        message: 'TypeError: Cannot read property \'userId\' of undefined',
+        service: 'mobile-app',
+        stackTrace: 'TypeError: Cannot read property \'userId\' of undefined\n    at UserProfile.render (UserProfile.js:45)\n    at App.componentDidMount (App.js:120)'
+      },
+      {
+        timestamp: '2024-04-23T16:06:15Z',
+        level: 'error',
+        message: 'API validation error: userId is required',
+        service: 'web-dashboard'
+      }
+    ],
+    metrics: [
+      { timestamp: '2024-04-23T15:00:00Z', metric: 'api.error_rate', value: 0.2, unit: '%' },
+      { timestamp: '2024-04-23T16:05:00Z', metric: 'api.error_rate', value: 42.5, unit: '%' },
+      { timestamp: '2024-04-23T16:20:00Z', metric: 'api.error_rate', value: 0.3, unit: '%' }
+    ],
+    alerts: [
+      {
+        timestamp: '2024-04-23T16:05:00Z',
+        type: 'trigger',
+        message: 'API error rate exceeds 10% threshold'
+      },
+      {
+        timestamp: '2024-04-23T16:07:00Z',
+        type: 'acknowledge',
+        message: 'Incident acknowledged',
+        user: 'Casey Martinez'
+      }
+    ]
   }
 ];

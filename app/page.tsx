@@ -29,11 +29,13 @@ export default function Dashboard() {
         body: JSON.stringify({ incidentId: incident.id })
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to generate postmortem');
-      }
-
       const data = await response.json();
+
+      if (!response.ok) {
+        // Handle specific error messages from API
+        const errorMessage = data.error?.message || 'Failed to generate postmortem';
+        throw new Error(errorMessage);
+      }
 
       // Small delay to show completion of all stages
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -43,7 +45,10 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error generating postmortem:', error);
       setShowGeneratingModal(false);
-      alert('Failed to generate postmortem. Please try again.');
+
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      alert(`⚠️ ${errorMessage}\n\nPlease try again or contact support if the problem persists.`);
     } finally {
       setGeneratingFor(null);
     }
