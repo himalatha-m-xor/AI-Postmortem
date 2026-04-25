@@ -1,0 +1,57 @@
+graph TB
+    subgraph Browser["User Interface"]
+        UI1[Dashboard]
+        UI2[Postmortem Viewer]
+    end
+
+    subgraph NextJS["Next.js Application"]
+        subgraph Frontend["Frontend"]
+            P1[page.tsx]
+            P2[postmortems]
+        end
+        
+        subgraph API["API Layer"]
+            API1[POST /generate]
+            API2[GET /generate]
+        end
+        
+        subgraph Logic["Business Logic"]
+            L1[AI Generator]
+            L2[Prompt Builder]
+            L3[Storage]
+            L4[Rate Limiter]
+        end
+        
+        subgraph Data["Data"]
+            D1[Mock Incidents]
+            D2[In-Memory]
+        end
+    end
+
+    subgraph External["External Services"]
+        AI[OpenAI GPT-4o-mini]
+    end
+
+    UI1 -->|Generate| P1
+    P1 -->|POST| API1
+    API1 -->|Validate| L4
+    API1 -->|Fetch| D1
+    API1 -->|Call| L1
+    L1 -->|Build| L2
+    L1 -->|Request| AI
+    AI -->|JSON| L1
+    L1 -->|Save| L3
+    L3 -->|Store| D2
+    API1 -->|Return| P1
+    P1 -->|Navigate| P2
+    P2 -->|GET| API2
+    API2 -->|Fetch| D2
+    UI2 -->|Display| P2
+
+    style Browser fill:#334155,stroke:#64748b,color:#f1f5f9
+    style NextJS fill:#1e293b,stroke:#475569,color:#f1f5f9
+    style External fill:#7c3aed,stroke:#6d28d9,color:#fff
+    style Frontend fill:#1e3a5f,stroke:#3b82f6,color:#f1f5f9
+    style API fill:#164e63,stroke:#06b6d4,color:#f1f5f9
+    style Logic fill:#166534,stroke:#22c55e,color:#f1f5f9
+    style Data fill:#92400e,stroke:#f59e0b,color:#f1f5f9
