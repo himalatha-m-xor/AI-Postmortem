@@ -15,7 +15,7 @@ export const config = {
     apiKey: process.env.OPENAI_API_KEY || '',
     model: 'gpt-4o-mini',
     maxTokens: 4000,
-    temperature: 0.7,
+    temperature: 0.4,
   },
 
   // Database

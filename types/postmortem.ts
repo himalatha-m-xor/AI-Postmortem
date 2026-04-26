@@ -42,6 +42,7 @@ export interface Postmortem {
   whatWentWell: string[];
   whatWentPoorly: string[];
   remediationSteps: string[];
+  recentCodeChanges?: string[]; // GitHub commits
   preventionMeasures: PreventionMeasure[];
   actionItems: ActionItem[];
 }

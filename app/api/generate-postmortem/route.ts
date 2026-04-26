@@ -6,8 +6,6 @@ import { NotFoundError, ValidationError, formatErrorResponse, AIGenerationError 
 import { rateLimiter, getClientIdentifier } from '@/lib/rate-limit';
 import { config } from '@/lib/config';
 import { savePostmortem, getPostmortem, getAllPostmortems } from '@/lib/storage';
-import { savePostmortemToDB } from '@/lib/db/postmortems';
-import { getIncidentFromDB } from '@/lib/db/incidents';
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,14 +49,6 @@ export async function POST(request: NextRequest) {
 
     // Store in memory
     savePostmortem(postmortem);
-
-    // Store in database
-    try {
-      await savePostmortemToDB(postmortem);
-      logger.info(`Postmortem saved to database: ${postmortem.id}`);
-    } catch (dbError) {
-      logger.error('Failed to save postmortem to database, continuing anyway', dbError as Error);
-    }
 
     logger.info(`✅ Postmortem generated successfully: ${postmortem.id}`);
 

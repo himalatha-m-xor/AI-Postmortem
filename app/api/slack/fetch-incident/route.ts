@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { slackClient, transformSlackToIncident } from '@/lib/integrations/slack';
 import { logger } from '@/lib/logger';
 import { formatErrorResponse } from '@/lib/errors';
-import { saveIncidentToDB } from '@/lib/db/incidents';
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,14 +58,6 @@ export async function POST(request: NextRequest) {
     });
 
     logger.info(`Successfully created incident from ${messages.length} Slack messages`);
-
-    // Save to database
-    try {
-      await saveIncidentToDB(incident);
-      logger.info(`Incident saved to database: ${incident.id}`);
-    } catch (dbError) {
-      logger.error('Failed to save incident to database, continuing anyway', dbError as Error);
-    }
 
     return NextResponse.json({
       success: true,

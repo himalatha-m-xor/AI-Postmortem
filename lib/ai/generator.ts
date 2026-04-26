@@ -13,15 +13,32 @@ export async function generatePostmortem(incident: Incident): Promise<Postmortem
 
     // Fetch GitHub context if enabled
     let githubContext = '';
+    let githubCommits: string[] = [];
+    logger.info(`GitHub feature enabled: ${config.features.github}`);
+    logger.info(`ENABLE_GITHUB env var: ${process.env.ENABLE_GITHUB}`);
+
     if (config.features.github) {
-      logger.info('Fetching GitHub context for incident');
+      logger.info('✅ Fetching GitHub context for incident');
       try {
         const context = await fetchGitHubContext(incident.startTime, incident.endTime);
         githubContext = formatGitHubContextForPrompt(context);
-        logger.debug(`GitHub context fetched: ${githubContext.length} chars`);
+
+        // Extract commits for manual inclusion
+        if (context.commits && context.commits.length > 0) {
+          githubCommits = context.commits.map(commit =>
+            `${commit.sha} - ${commit.message} (${commit.author})`
+          );
+          logger.info(`✅ Extracted ${githubCommits.length} commits for manual inclusion`);
+        }
+
+        logger.info(`✅ GitHub context fetched successfully: ${githubContext.length} chars`);
+        logger.debug(`GitHub data preview: ${githubContext.substring(0, 200)}...`);
       } catch (error) {
-        logger.warn('Failed to fetch GitHub context, continuing without it', error as Error);
+        logger.error('❌ Failed to fetch GitHub context', error as Error);
+        logger.warn('Continuing without GitHub data');
       }
+    } else {
+      logger.warn('⚠️ GitHub integration is DISABLED. Set ENABLE_GITHUB=true in .env.local');
     }
 
     const prompt = buildPostmortemPrompt(incident, githubContext);
@@ -80,9 +97,14 @@ export async function generatePostmortem(incident: Incident): Promise<Postmortem
       whatWentWell: aiResponse.whatWentWell || [],
       whatWentPoorly: aiResponse.whatWentPoorly || [],
       remediationSteps: aiResponse.remediationSteps || [],
+      recentCodeChanges: aiResponse.recentCodeChanges || (githubCommits.length > 0 ? githubCommits : undefined),
       preventionMeasures: aiResponse.preventionMeasures || [],
       actionItems: aiResponse.actionItems || []
     };
+
+    if (githubCommits.length > 0 && !aiResponse.recentCodeChanges) {
+      logger.warn(`⚠️ AI did not include recentCodeChanges, manually added ${githubCommits.length} GitHub commits`);
+    }
 
     logger.info(`✅ Postmortem generated successfully: ${postmortem.id}`);
     return postmortem;

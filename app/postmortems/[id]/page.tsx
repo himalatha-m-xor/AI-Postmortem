@@ -411,6 +411,19 @@ export default function PostmortemViewer() {
           )}
         </div>
 
+        {/* Recent Code Changes (GitHub) */}
+        {postmortem.recentCodeChanges && postmortem.recentCodeChanges.length > 0 && (
+          <Section title="📦 Recent Code Changes">
+            <div className="space-y-2 font-mono text-xs">
+              {postmortem.recentCodeChanges.map((change, index) => (
+                <div key={index} className="text-slate-300 bg-slate-800/50 p-2 rounded">
+                  {change}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
         {/* Prevention Measures */}
         <Section title="🛡️ Prevention Measures">
           <div className="space-y-3">

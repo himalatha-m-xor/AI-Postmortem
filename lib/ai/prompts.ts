@@ -43,9 +43,12 @@ Generate a comprehensive, blameless postmortem that:
 6. Follows the structure below exactly
 
 # CRITICAL RULES:
-- Timeline MUST come from actual Slack messages only
-- Root cause MUST be based on what's mentioned in Slack/logs only
+- Timeline MUST come from actual Slack messages AND GitHub commits/deployments (if provided)
+- **MANDATORY**: If GitHub data is available, you MUST include a "Recent Code Changes" section showing commits
+- **MANDATORY**: If GitHub commits are in the last 24h, list them in timeline with actual timestamps
+- Root cause MUST be based on what's mentioned in Slack/logs/GitHub only
 - Contributing factors MUST be based on actual issues mentioned
+- If GitHub shows ANY commits, ALWAYS mention them as context (even if not directly related)
 - Prevention measures should be general best practices, not invented specifics
 - DO NOT make up team names, owner names, or fake technical details
 - If no logs are provided, don't invent error messages
@@ -83,6 +86,14 @@ Generate a comprehensive, blameless postmortem that:
   "remediationSteps": [
     "ONLY actions ACTUALLY mentioned in Slack (e.g., 'Deployed hotfix', 'Rolled back deployment')",
     "Use exact or paraphrased Slack text - DO NOT invent steps"
+  ],
+  "recentCodeChanges": [
+    "⚠️ CRITICAL: You MUST include this array if GitHub data is in the prompt above",
+    "Copy the commit lines EXACTLY from the 'Recent Commits' section above",
+    "Format: 'commit_sha - commit_message (author)'",
+    "Even if commits seem unrelated, INCLUDE them for context",
+    "Example: ['adfe38a - docs: consolidate documentation (Ravi-k-xor)', '7f33266 - Updated code (himalatha-m-xor)']",
+    "If you see 'Recent Commits' above, you MUST populate this field"
   ],
   "preventionMeasures": [
     {
@@ -124,6 +135,9 @@ Generate a comprehensive, blameless postmortem that:
 □ No invented technical details or error messages?
 □ No fake team names or owners?
 □ Root cause based only on what's in Slack/logs?
+□ ⚠️ CRITICAL: If GitHub commits are shown above, did I include "recentCodeChanges" array?
+
+🚨 MANDATORY: If you see "Recent Commits" in the GitHub section above, you MUST include the "recentCodeChanges" field in your JSON response.
 
 Generate the postmortem JSON now:`;
 }

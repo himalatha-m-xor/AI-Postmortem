@@ -20,33 +20,7 @@ export default function Dashboard() {
   // Show mock data initially, but hide when Slack data is fetched
   const displayIncidents = showMockData && incidents.length === 0 ? MOCK_INCIDENTS : incidents;
 
-  // Fetch real dashboard stats and incidents on mount
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
 
-  const fetchDashboardData = async () => {
-    try {
-      // Fetch stats
-      const statsResponse = await fetch('/api/dashboard/stats');
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        setStats(statsData);
-      }
-
-      // Fetch incidents
-      const incidentsResponse = await fetch('/api/incidents');
-      if (incidentsResponse.ok) {
-        const incidentsData = await incidentsResponse.json();
-        if (incidentsData.incidents.length > 0) {
-          setIncidents(incidentsData.incidents);
-          setShowMockData(false);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
-    }
-  };
 
   const handleFetchFromSlack = async () => {
     setFetchingSlack(true);
@@ -63,14 +37,11 @@ export default function Dashboard() {
         throw new Error(data.error || 'Failed to fetch from Slack');
       }
 
-      // Replace mock data with Slack data
+      // Replace mock data with ONLY real Slack data
       setShowMockData(false);
-      setIncidents([data.incident]);
+      setIncidents([data.incident]); // ONLY show the real incident
 
-      // Refresh dashboard stats
-      await fetchDashboardData();
-
-      alert(`✅ Fetched incident from Slack: ${data.incident.title}\n${data.messagesCount} messages imported!`);
+      alert(`✅ Fetched incident from Slack!\n\n"${data.incident.title}"\n\n${data.messagesCount} messages imported.\n\nMock data hidden - showing only real incident.`);
     } catch (error) {
       console.error('Error fetching from Slack:', error);
       alert(`❌ Failed to fetch from Slack: ${error instanceof Error ? error.message : 'Unknown error'}`);
