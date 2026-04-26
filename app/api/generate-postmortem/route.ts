@@ -6,6 +6,8 @@ import { NotFoundError, ValidationError, formatErrorResponse, AIGenerationError 
 import { rateLimiter, getClientIdentifier } from '@/lib/rate-limit';
 import { config } from '@/lib/config';
 import { savePostmortem, getPostmortem, getAllPostmortems } from '@/lib/storage';
+import { savePostmortemToDB } from '@/lib/db/postmortems';
+import { getIncidentFromDB } from '@/lib/db/incidents';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,15 +20,19 @@ export async function POST(request: NextRequest) {
       logger.debug(`Rate limit check passed for: ${clientId}`);
     }
 
-    const { incidentId } = await request.json();
+    const { incidentId, incident: providedIncident } = await request.json();
 
     if (!incidentId) {
       logger.warn('Missing incident ID in request');
       throw new ValidationError('Incident ID is required');
     }
 
-    // Find the incident
-    const incident = MOCK_INCIDENTS.find(i => i.id === incidentId);
+    // Try to find incident from provided data first, then mock data
+    let incident = providedIncident;
+
+    if (!incident) {
+      incident = MOCK_INCIDENTS.find(i => i.id === incidentId);
+    }
 
     if (!incident) {
       logger.warn(`Incident not found: ${incidentId}`);
@@ -43,8 +49,16 @@ export async function POST(request: NextRequest) {
     // Generate postmortem using AI
     const postmortem = await generatePostmortem(incident);
 
-    // Store in global storage
+    // Store in memory
     savePostmortem(postmortem);
+
+    // Store in database
+    try {
+      await savePostmortemToDB(postmortem);
+      logger.info(`Postmortem saved to database: ${postmortem.id}`);
+    } catch (dbError) {
+      logger.error('Failed to save postmortem to database, continuing anyway', dbError as Error);
+    }
 
     logger.info(`✅ Postmortem generated successfully: ${postmortem.id}`);
 

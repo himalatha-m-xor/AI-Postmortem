@@ -1,22 +1,83 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MOCK_INCIDENTS } from '@/lib/data/incidents';
 import { Incident } from '@/types/incident';
-import { AlertCircle, TrendingDown, FileText, Flame } from 'lucide-react';
+import { AlertCircle, TrendingDown, FileText, Flame, MessageSquare } from 'lucide-react';
 import { getSeverityColor, getSeverityTextColor, formatDuration } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { GeneratingModal } from '@/components/GeneratingModal';
 
 export default function Dashboard() {
-  const [incidents] = useState<Incident[]>(MOCK_INCIDENTS);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [showMockData, setShowMockData] = useState(true);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [showGeneratingModal, setShowGeneratingModal] = useState(false);
+  const [fetchingSlack, setFetchingSlack] = useState(false);
+  const [stats, setStats] = useState({ activeIncidents: 0, avgMTTR: 45, postmortemsThisWeek: 12 });
   const router = useRouter();
 
-  const activeIncidents = incidents.filter(i => i.status !== 'resolved');
-  const avgMTTR = 45; // Mock data
-  const postmortemsThisWeek = 12; // Mock data
+  // Show mock data initially, but hide when Slack data is fetched
+  const displayIncidents = showMockData && incidents.length === 0 ? MOCK_INCIDENTS : incidents;
+
+  // Fetch real dashboard stats and incidents on mount
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch stats
+      const statsResponse = await fetch('/api/dashboard/stats');
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        setStats(statsData);
+      }
+
+      // Fetch incidents
+      const incidentsResponse = await fetch('/api/incidents');
+      if (incidentsResponse.ok) {
+        const incidentsData = await incidentsResponse.json();
+        if (incidentsData.incidents.length > 0) {
+          setIncidents(incidentsData.incidents);
+          setShowMockData(false);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    }
+  };
+
+  const handleFetchFromSlack = async () => {
+    setFetchingSlack(true);
+    try {
+      const response = await fetch('/api/slack/fetch-incident', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hours: 24 }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch from Slack');
+      }
+
+      // Replace mock data with Slack data
+      setShowMockData(false);
+      setIncidents([data.incident]);
+
+      // Refresh dashboard stats
+      await fetchDashboardData();
+
+      alert(`✅ Fetched incident from Slack: ${data.incident.title}\n${data.messagesCount} messages imported!`);
+    } catch (error) {
+      console.error('Error fetching from Slack:', error);
+      alert(`❌ Failed to fetch from Slack: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setFetchingSlack(false);
+    }
+  };
 
   const handleGeneratePostmortem = async (incident: Incident) => {
     setGeneratingFor(incident.id);
@@ -26,7 +87,10 @@ export default function Dashboard() {
       const response = await fetch('/api/generate-postmortem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ incidentId: incident.id })
+        body: JSON.stringify({
+          incidentId: incident.id,
+          incident: incident  // Pass full incident data for Slack incidents
+        })
       });
 
       const data = await response.json();
@@ -72,10 +136,14 @@ export default function Dashboard() {
                 <p className="text-xs text-slate-400">Living Postmortem AI</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <div className="h-2 w-2 rounded-full bg-green-500"></div>
-              All Systems Operational
-            </div>
+            <button
+              onClick={handleFetchFromSlack}
+              disabled={fetchingSlack}
+              className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-50"
+            >
+              <MessageSquare className="h-4 w-4" />
+              {fetchingSlack ? 'Fetching...' : 'Fetch from Slack'}
+            </button>
           </div>
         </div>
       </header>
@@ -86,20 +154,19 @@ export default function Dashboard() {
           <StatCard
             icon={<AlertCircle className="h-6 w-6" />}
             label="Active Incidents"
-            value={activeIncidents.length.toString()}
+            value={stats.activeIncidents.toString()}
             color="text-red-400"
           />
           <StatCard
             icon={<TrendingDown className="h-6 w-6" />}
             label="Avg MTTR"
-            value={`${avgMTTR}m`}
-            subtitle="↓ 20% vs last week"
+            value={`${stats.avgMTTR}m`}
             color="text-green-400"
           />
           <StatCard
             icon={<FileText className="h-6 w-6" />}
             label="Generated This Week"
-            value={postmortemsThisWeek.toString()}
+            value={stats.postmortemsThisWeek.toString()}
             color="text-violet-400"
           />
         </div>
@@ -108,7 +175,13 @@ export default function Dashboard() {
         <section className="mb-8">
           <h2 className="mb-4 text-2xl font-bold text-white">🚨 Open Incidents</h2>
           <div className="space-y-4">
-            {activeIncidents.map((incident) => (
+            {displayIncidents.length === 0 && (
+            <div className="col-span-full text-center py-12 text-slate-500">
+              <p className="mb-4">No incidents found.</p>
+              <p className="text-sm">Click "Fetch from Slack" to import incidents from your Slack channel.</p>
+            </div>
+          )}
+          {displayIncidents.map((incident) => (
               <IncidentCard
                 key={incident.id}
                 incident={incident}

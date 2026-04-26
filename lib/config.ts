@@ -38,11 +38,26 @@ export const config = {
   // Debug
   debug: process.env.DEBUG_MODE === 'true',
 
+  // Slack
+  slack: {
+    botToken: process.env.SLACK_BOT_TOKEN || '',
+    channelId: process.env.SLACK_INCIDENT_CHANNEL_ID || '',
+  },
+
+  // GitHub
+  github: {
+    token: process.env.GITHUB_TOKEN || '',
+    org: process.env.GITHUB_ORG || '',
+    repo: process.env.GITHUB_REPO || '',
+  },
+
   // Features (toggle features on/off)
   features: {
     authentication: false, // Will enable later
     database: false, // Will enable later
     rateLimiting: true,
+    slack: process.env.ENABLE_SLACK === 'true',
+    github: process.env.ENABLE_GITHUB === 'true',
   },
 };
 
