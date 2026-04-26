@@ -3,12 +3,28 @@ import { buildPostmortemPrompt } from './prompts';
 import { Incident } from '@/types/incident';
 import { Postmortem } from '@/types/postmortem';
 import { logger } from '@/lib/logger';
+import { fetchGitHubContext, formatGitHubContextForPrompt } from '@/lib/integrations/github';
+import { config } from '@/lib/config';
 import { AIGenerationError } from '@/lib/errors';
 
 export async function generatePostmortem(incident: Incident): Promise<Postmortem> {
   try {
     logger.info(`🤖 Starting AI generation for incident: ${incident.id}`);
-    const prompt = buildPostmortemPrompt(incident);
+
+    // Fetch GitHub context if enabled
+    let githubContext = '';
+    if (config.features.github) {
+      logger.info('Fetching GitHub context for incident');
+      try {
+        const context = await fetchGitHubContext(incident.startTime, incident.endTime);
+        githubContext = formatGitHubContextForPrompt(context);
+        logger.debug(`GitHub context fetched: ${githubContext.length} chars`);
+      } catch (error) {
+        logger.warn('Failed to fetch GitHub context, continuing without it', error as Error);
+      }
+    }
+
+    const prompt = buildPostmortemPrompt(incident, githubContext);
 
     // Use model from env or default
     const model = process.env.LLM_MODEL || 'gpt-4o-mini';

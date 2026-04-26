@@ -1,6 +1,6 @@
 import { Incident } from '@/types/incident';
 
-export function buildPostmortemPrompt(incident: Incident): string {
+export function buildPostmortemPrompt(incident: Incident, githubContext?: string): string {
   return `You are a Staff Site Reliability Engineer writing a blameless postmortem following Google SRE best practices.
 
 ⚠️ ABSOLUTE RULES - CRITICAL:
@@ -29,6 +29,9 @@ ${JSON.stringify({
   metricsData: incident.metrics,
   alertHistory: incident.alerts
 }, null, 2)}
+
+## GitHub Deployment & Code Changes:
+${githubContext || 'No GitHub data available (not configured or no recent activity)'}
 
 # YOUR TASK:
 Generate a comprehensive, blameless postmortem that:
