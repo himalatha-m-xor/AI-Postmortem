@@ -18,9 +18,13 @@ export const config = {
     temperature: 0.4,
   },
 
-  // Database
-  database: {
-    url: process.env.DATABASE_URL || '',
+  // PostgreSQL Database
+  postgres: {
+    database: process.env.POSTGRES_DB || 'aria_postmortem',
+    user: process.env.POSTGRES_USER || 'postgres',
+    password: process.env.POSTGRES_PASSWORD || '',
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: parseInt(process.env.POSTGRES_PORT || '5432'),
   },
 
   // Session
@@ -54,7 +58,7 @@ export const config = {
   // Features (toggle features on/off)
   features: {
     authentication: false, // Will enable later
-    database: false, // Will enable later
+    database: true, // PostgreSQL integration enabled
     rateLimiting: true,
     slack: process.env.ENABLE_SLACK === 'true',
     github: process.env.ENABLE_GITHUB === 'true',
