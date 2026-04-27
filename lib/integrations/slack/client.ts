@@ -1,5 +1,6 @@
 // Slack API Client
 import { logger } from '@/lib/logger';
+import { config } from '@/lib/config';
 
 export interface SlackMessage {
   user: string;
@@ -58,7 +59,9 @@ class SlackClient {
       limit?: number;
     } = {}
   ): Promise<SlackMessage[]> {
-    logger.info(`Fetching Slack messages from channel: ${channelId}`);
+    if (config.debug) {
+      logger.info(`Fetching Slack messages from channel: ${channelId}`);
+    }
 
     try {
       const data = await this.request('conversations.history', {
@@ -68,7 +71,9 @@ class SlackClient {
         limit: options.limit || 100,
       });
 
-      logger.info(`Fetched ${data.messages?.length || 0} messages from Slack`);
+      if (config.debug) {
+        logger.info(`Fetched ${data.messages?.length || 0} messages from Slack`);
+      }
       return data.messages || [];
     } catch (error) {
       logger.error('Failed to fetch Slack messages', error as Error);

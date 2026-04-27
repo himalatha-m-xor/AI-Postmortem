@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { MOCK_INCIDENTS } from '@/lib/data/incidents';
 import { Incident } from '@/types/incident';
-import { AlertCircle, TrendingDown, FileText, Flame, MessageSquare } from 'lucide-react';
+import { Flame, MessageSquare, User, LogOut } from 'lucide-react';
 import { getSeverityColor, getSeverityTextColor, formatDuration } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { GeneratingModal } from '@/components/GeneratingModal';
@@ -14,13 +14,93 @@ export default function Dashboard() {
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [showGeneratingModal, setShowGeneratingModal] = useState(false);
   const [fetchingSlack, setFetchingSlack] = useState(false);
-  const [stats, setStats] = useState({ activeIncidents: 0, avgMTTR: 45, postmortemsThisWeek: 12 });
+  const [recentPostmortems, setRecentPostmortems] = useState<any[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const router = useRouter();
+
+  // Check authentication and load data on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/me');
+        const data = await response.json();
+
+        if (!data.user) {
+          router.push('/login');
+          return;
+        }
+
+        setIsAuthenticated(true);
+        setCurrentUser(data.user);
+
+        // Load dashboard data after auth check
+        await loadDashboardData();
+      } catch (error) {
+        router.push('/login');
+      }
+    };
+
+    const loadDashboardData = async () => {
+      try {
+        // Fetch incidents
+        const incidentsResponse = await fetch('/api/incidents');
+        if (incidentsResponse.ok) {
+          const incidentsData = await incidentsResponse.json();
+          if (incidentsData.source === 'database' && incidentsData.incidents.length > 0) {
+            setIncidents(incidentsData.incidents);
+            setShowMockData(false);
+          }
+        }
+
+        // Fetch recent postmortems
+        const postmortemsResponse = await fetch('/api/postmortems/recent');
+        if (postmortemsResponse.ok) {
+          const postmortemsData = await postmortemsResponse.json();
+          setRecentPostmortems(postmortemsData.postmortems || []);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showUserMenu && !target.closest('.user-menu-container')) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showUserMenu]);
+
+  // Show loading while checking auth
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
 
   // Show mock data initially, but hide when Slack data is fetched
   const displayIncidents = showMockData && incidents.length === 0 ? MOCK_INCIDENTS : incidents;
 
-
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   const handleFetchFromSlack = async () => {
     setFetchingSlack(true);
@@ -37,11 +117,29 @@ export default function Dashboard() {
         throw new Error(data.error || 'Failed to fetch from Slack');
       }
 
-      // Replace mock data with ONLY real Slack data
-      setShowMockData(false);
-      setIncidents([data.incident]); // ONLY show the real incident
+      // Log incident IDs for debugging
+      console.log('📋 Fetched incidents with IDs:', data.incidents.map((inc: any) => inc.id));
 
-      alert(`✅ Fetched incident from Slack!\n\n"${data.incident.title}"\n\n${data.messagesCount} messages imported.\n\nMock data hidden - showing only real incident.`);
+      // Refresh incidents
+      const incidentsResponse = await fetch('/api/incidents');
+      if (incidentsResponse.ok) {
+        const incidentsData = await incidentsResponse.json();
+        if (incidentsData.source === 'database' && incidentsData.incidents.length > 0) {
+          console.log('📊 Dashboard now showing incidents:', incidentsData.incidents.map((inc: any) => inc.id));
+          setIncidents(incidentsData.incidents);
+          setShowMockData(false);
+        }
+      }
+
+      // Show success message with all incident titles
+      const titles = data.incidents.map((inc: any, i: number) => `${i + 1}. ${inc.title}`).join('\n');
+
+      alert(
+        `✅ Fetched ${data.incidentCount} incident(s) from Slack!\n\n` +
+        `${titles}\n\n` +
+        `${data.messagesCount} messages analyzed.\n` +
+        `${data.savedCount} saved to database!`
+      );
     } catch (error) {
       console.error('Error fetching from Slack:', error);
       alert(`❌ Failed to fetch from Slack: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -75,6 +173,13 @@ export default function Dashboard() {
       // Small delay to show completion of all stages
       await new Promise(resolve => setTimeout(resolve, 1000));
 
+      // Refresh postmortems
+      const postmortemsResponse = await fetch('/api/postmortems/recent');
+      if (postmortemsResponse.ok) {
+        const postmortemsData = await postmortemsResponse.json();
+        setRecentPostmortems(postmortemsData.postmortems || []);
+      }
+
       // Redirect to postmortem viewer
       router.push(`/postmortems/${data.postmortem.id}`);
     } catch (error) {
@@ -107,41 +212,56 @@ export default function Dashboard() {
                 <p className="text-xs text-slate-400">Living Postmortem AI</p>
               </div>
             </div>
-            <button
-              onClick={handleFetchFromSlack}
-              disabled={fetchingSlack}
-              className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-50"
-            >
-              <MessageSquare className="h-4 w-4" />
-              {fetchingSlack ? 'Fetching...' : 'Fetch from Slack'}
-            </button>
+
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleFetchFromSlack}
+                disabled={fetchingSlack}
+                className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-50"
+              >
+                <MessageSquare className="h-4 w-4" />
+                {fetchingSlack ? 'Fetching...' : 'Fetch from Slack'}
+              </button>
+
+              {/* User Menu */}
+              <div className="relative user-menu-container">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+                >
+                  {currentUser?.avatar ? (
+                    <img src={currentUser.avatar} alt={currentUser.name} className="h-6 w-6 rounded-full" />
+                  ) : (
+                    <User className="h-5 w-5" />
+                  )}
+                  <span className="text-sm font-medium">{currentUser?.name || 'User'}</span>
+                </button>
+
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 rounded-lg bg-slate-800 border border-slate-700 shadow-xl z-50">
+                    <div className="p-3 border-b border-slate-700">
+                      <div className="text-sm font-medium text-white">{currentUser?.name}</div>
+                      <div className="text-xs text-slate-400">{currentUser?.email}</div>
+                      <div className="mt-1 inline-block px-2 py-0.5 text-xs rounded bg-violet-600/20 text-violet-400">
+                        {currentUser?.role}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-b-lg"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-6 py-8">
-        {/* Stats Cards */}
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <StatCard
-            icon={<AlertCircle className="h-6 w-6" />}
-            label="Active Incidents"
-            value={stats.activeIncidents.toString()}
-            color="text-red-400"
-          />
-          <StatCard
-            icon={<TrendingDown className="h-6 w-6" />}
-            label="Avg MTTR"
-            value={`${stats.avgMTTR}m`}
-            color="text-green-400"
-          />
-          <StatCard
-            icon={<FileText className="h-6 w-6" />}
-            label="Generated This Week"
-            value={stats.postmortemsThisWeek.toString()}
-            color="text-violet-400"
-          />
-        </div>
-
         {/* Open Incidents */}
         <section className="mb-8">
           <h2 className="mb-4 text-2xl font-bold text-white">🚨 Open Incidents</h2>
@@ -167,36 +287,26 @@ export default function Dashboard() {
         <section>
           <h2 className="mb-4 text-2xl font-bold text-white">✅ Recent Postmortems</h2>
           <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-6">
-            <ul className="space-y-2 text-slate-300">
-              <li className="flex items-center gap-2">
-                <span className="text-slate-500">•</span>
-                <span className="text-sm">Apr 20: Auth Service SSL Certificate Expired</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-slate-500">•</span>
-                <span className="text-sm">Apr 18: Redis Memory Leak in Cache Layer</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-slate-500">•</span>
-                <span className="text-sm">Apr 15: Load Balancer Configuration Error</span>
-              </li>
-            </ul>
+            {recentPostmortems.length > 0 ? (
+              <ul className="space-y-2 text-slate-300">
+                {recentPostmortems.map((pm) => (
+                  <li key={pm.id} className="flex items-center gap-2">
+                    <span className="text-slate-500">•</span>
+                    <a
+                      href={`/postmortems/${pm.id}`}
+                      className="text-sm hover:text-violet-400 transition cursor-pointer"
+                    >
+                      {new Date(pm.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: {pm.incidentTitle}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">No postmortems generated yet. Generate one from an incident above!</p>
+            )}
           </div>
         </section>
       </main>
-    </div>
-  );
-}
-
-function StatCard({ icon, label, value, subtitle, color }: any) {
-  return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-6">
-      <div className="mb-2 flex items-center justify-between">
-        <span className={`${color}`}>{icon}</span>
-      </div>
-      <div className="text-3xl font-bold text-white">{value}</div>
-      <div className="text-sm text-slate-400">{label}</div>
-      {subtitle && <div className="mt-1 text-xs text-green-400">{subtitle}</div>}
     </div>
   );
 }

@@ -1,14 +1,18 @@
 // Fetch incident from Slack channel
 import { NextRequest, NextResponse } from 'next/server';
-import { slackClient, transformSlackToIncident } from '@/lib/integrations/slack';
+import { slackClient, splitIntoMultipleIncidents } from '@/lib/integrations/slack';
+import { saveIncidentToDB } from '@/lib/db/incidents';
 import { logger } from '@/lib/logger';
 import { formatErrorResponse } from '@/lib/errors';
+import { config } from '@/lib/config';
 
 export async function POST(request: NextRequest) {
   try {
     const { channelId, hours, title, severity } = await request.json();
 
-    logger.info('Fetching incident from Slack', { channelId, hours });
+    if (config.debug) {
+      logger.info('Fetching incident from Slack', { channelId, hours });
+    }
 
     if (!slackClient.isConfigured()) {
       return NextResponse.json(
@@ -50,19 +54,38 @@ export async function POST(request: NextRequest) {
     // Get channel info
     const channelInfo = await slackClient.getChannelInfo(targetChannel);
 
-    // Transform to incident
-    const incident = await transformSlackToIncident(messages, {
-      title,
-      severity,
+    // Split into multiple incidents based on "new incident" keyword
+    const incidents = await splitIntoMultipleIncidents(messages, {
       channelName: channelInfo.name,
     });
 
-    logger.info(`Successfully created incident from ${messages.length} Slack messages`);
+    if (config.debug) {
+      logger.info(`Split ${messages.length} messages into ${incidents.length} incident(s)`);
+    }
+
+    // Save all incidents to database
+    let savedCount = 0;
+    if (config.features.database) {
+      for (const incident of incidents) {
+        try {
+          await saveIncidentToDB(incident);
+          savedCount++;
+          if (config.debug) {
+            logger.info(`✅ Incident saved to database: ${incident.id}`);
+          }
+        } catch (dbError) {
+          logger.error(`Failed to save incident ${incident.id} to database`, dbError as Error);
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      incident,
+      incidents,
+      incidentCount: incidents.length,
       messagesCount: messages.length,
+      savedToDatabase: config.features.database,
+      savedCount,
     });
   } catch (error) {
     logger.error('Failed to fetch incident from Slack', error as Error);

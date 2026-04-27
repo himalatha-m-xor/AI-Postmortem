@@ -3,8 +3,12 @@ import { MOCK_INCIDENTS } from '@/lib/data/incidents';
 import { getAllIncidentsFromDB } from '@/lib/db/incidents';
 import { logger } from '@/lib/logger';
 import { config } from '@/lib/config';
+import { showStartupBanner } from '@/lib/startup-banner';
 
 export async function GET() {
+  // Show startup banner on first API call
+  showStartupBanner();
+
   try {
     // Try to get incidents from database if enabled
     if (config.features.database) {

@@ -32,7 +32,10 @@ export function getPool(): Pool {
       logger.error('Unexpected error on idle PostgreSQL client', err);
     });
 
-    logger.info(`PostgreSQL pool created: ${poolConfig.database}@${poolConfig.host}:${poolConfig.port}`);
+    // Only log in debug mode
+    if (config.debug) {
+      logger.info(`PostgreSQL pool created: ${poolConfig.database}@${poolConfig.host}:${poolConfig.port}`);
+    }
   }
 
   return pool;

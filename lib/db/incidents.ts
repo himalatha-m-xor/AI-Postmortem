@@ -2,11 +2,14 @@
 import { query } from './pool';
 import type { Incident } from '@/types/incident';
 import { logger } from '@/lib/logger';
+import { config } from '@/lib/config';
 
 // Save incident to database
 export async function saveIncidentToDB(incident: Incident) {
   try {
-    logger.info(`Saving incident to database: ${incident.id}`);
+    if (config.debug) {
+      logger.info(`Saving incident to database: ${incident.id}`);
+    }
 
     // Insert incident
     await query(
@@ -47,7 +50,9 @@ export async function saveIncidentToDB(incident: Incident) {
       }
     }
 
-    logger.info(`✅ Incident saved successfully: ${incident.id}`);
+    if (config.debug) {
+      logger.info(`✅ Incident saved successfully: ${incident.id}`);
+    }
     return incident;
   } catch (error) {
     logger.error('Failed to save incident to database', error as Error);
@@ -150,15 +155,30 @@ export async function getDashboardStats() {
      WHERE status = 'resolved' AND end_time IS NOT NULL`
   );
 
+  // Debug logging
+  logger.debug('Dashboard stats calculation', {
+    totalIncidents,
+    activeIncidents,
+    resolvedCount: resolvedResult.rows.length,
+    resolvedRows: resolvedResult.rows
+  });
+
   // Calculate average MTTR
   let avgMTTR = 0;
   if (resolvedResult.rows.length > 0) {
     const totalMinutes = resolvedResult.rows.reduce((sum, row) => {
       const startTime = new Date(row.start_time).getTime();
       const endTime = new Date(row.end_time).getTime();
-      return sum + (endTime - startTime) / (1000 * 60);
+      const duration = (endTime - startTime) / (1000 * 60);
+      logger.debug('MTTR calculation for incident', {
+        startTime: row.start_time,
+        endTime: row.end_time,
+        durationMinutes: duration
+      });
+      return sum + duration;
     }, 0);
     avgMTTR = Math.round(totalMinutes / resolvedResult.rows.length);
+    logger.debug('Final MTTR', { totalMinutes, avgMTTR });
   }
 
   // Postmortems this week
@@ -168,6 +188,13 @@ export async function getDashboardStats() {
     [oneWeekAgo]
   );
   const postmortemsThisWeek = parseInt(postmortemsResult.rows[0].count);
+
+  logger.info('Dashboard stats calculated', {
+    activeIncidents,
+    avgMTTR,
+    postmortemsThisWeek,
+    totalIncidents,
+  });
 
   return {
     activeIncidents,

@@ -1,7 +1,73 @@
 // Transform Slack messages into Incident format
 import { slackClient, SlackMessage } from './client';
 import { logger } from '@/lib/logger';
+import { config } from '@/lib/config';
 import type { Incident } from '@/types/incident';
+
+// Split messages into multiple incidents based on "new incident" keyword
+export async function splitIntoMultipleIncidents(
+  messages: SlackMessage[],
+  options: { channelName?: string } = {}
+): Promise<Incident[]> {
+  if (config.debug) {
+    logger.info(`Splitting ${messages.length} messages into multiple incidents`);
+  }
+
+  if (messages.length === 0) {
+    return [];
+  }
+
+  // Sort messages chronologically (oldest first)
+  const sortedMessages = [...messages].sort((a, b) => parseFloat(a.ts) - parseFloat(b.ts));
+
+  const incidentGroups: SlackMessage[][] = [];
+  let currentGroup: SlackMessage[] = [];
+
+  for (const message of sortedMessages) {
+    const messageText = message.text.toLowerCase();
+
+    // Check if this message starts a new incident
+    const isNewIncident =
+      messageText.includes('new incident') ||
+      messageText.includes('new issue') ||
+      messageText.includes('incident:') ||
+      messageText.includes('🚨 incident') ||
+      messageText.includes('alert: incident');
+
+    // If we detect "new incident" and we already have messages, save current group
+    if (isNewIncident && currentGroup.length > 0) {
+      incidentGroups.push([...currentGroup]);
+      currentGroup = [];
+      logger.debug(`New incident detected at message: "${message.text.substring(0, 50)}..."`);
+    }
+
+    currentGroup.push(message);
+  }
+
+  // Add the last group
+  if (currentGroup.length > 0) {
+    incidentGroups.push(currentGroup);
+  }
+
+  if (config.debug) {
+    logger.info(`Split into ${incidentGroups.length} incident(s)`, {
+      messageCounts: incidentGroups.map(g => g.length)
+    });
+  }
+
+  // Transform each group into an Incident
+  const incidents: Incident[] = [];
+  for (let i = 0; i < incidentGroups.length; i++) {
+    const group = incidentGroups[i];
+    const incident = await transformSlackToIncident(group, options);
+    incidents.push(incident);
+    if (config.debug) {
+      logger.info(`Incident ${i + 1}: "${incident.title}" (${group.length} messages)`);
+    }
+  }
+
+  return incidents;
+}
 
 // Convert Slack timestamp to ISO string in IST
 function slackTsToISO(ts: string): string {
@@ -40,7 +106,9 @@ export async function transformSlackToIncident(
     channelName?: string;
   } = {}
 ): Promise<Incident> {
-  logger.info(`Transforming ${messages.length} Slack messages to incident format`);
+  if (config.debug) {
+    logger.info(`Transforming ${messages.length} Slack messages to incident format`);
+  }
 
   // Sort messages by timestamp (oldest first)
   const sortedMessages = [...messages].sort((a, b) =>
@@ -119,15 +187,31 @@ export async function transformSlackToIncident(
     })
   );
 
+  // Determine status based on conversation
+  const conversationText = actualMessages.map(m => m.text.toLowerCase()).join(' ');
+  let status: 'open' | 'investigating' | 'resolved' = 'investigating';
+
+  if (conversationText.includes('resolved') || conversationText.includes('fixed') || conversationText.includes('closed')) {
+    status = 'resolved';
+  } else if (conversationText.includes('investigating') || conversationText.includes('looking into') || conversationText.includes('checking')) {
+    status = 'investigating';
+  } else {
+    status = 'open';
+  }
+
+  // Generate a deterministic ID based on first message timestamp and channel
+  // This ensures the same incident doesn't get duplicated when fetching multiple times
+  const incidentId = `slack-${options.channelName || 'channel'}-${firstMessage.ts}`;
+
   // Create incident object
   const incident: Incident = {
-    id: `slack-${Date.now()}`,
+    id: incidentId,
     title: cleanTitle(title),
     description: `Incident detected from Slack conversation in ${options.channelName || 'channel'}`,
     severity,
-    status: 'resolved', // Assuming if we're generating postmortem, it's resolved
+    status, // Dynamic status based on conversation
     startTime: slackTsToISO(firstMessage.ts),
-    endTime: slackTsToISO(lastMessage.ts),
+    endTime: status === 'resolved' ? slackTsToISO(lastMessage.ts) : undefined,
     affectedServices: extractServices(sortedMessages),
     usersImpacted: estimateImpact(sortedMessages),
     slackChannel: options.channelName || 'unknown',
@@ -138,7 +222,9 @@ export async function transformSlackToIncident(
     alerts: extractAlerts(sortedMessages),
   };
 
-  logger.info(`Created incident: ${incident.title}`);
+  if (config.debug) {
+    logger.info(`Created incident: ${incident.title}`);
+  }
   return incident;
 }
 

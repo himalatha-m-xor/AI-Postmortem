@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:migrate": "tsx lib/db/migrate.ts",
-    "db:setup": "npm run db:migrate"
+    "db:setup": "npm run db:migrate",
+    "migrate:auth": "node scripts/migrate-auth.js"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.0",
